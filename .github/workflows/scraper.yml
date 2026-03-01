@@ -2,7 +2,7 @@ name: Sportradar Scraper
 
 on:
   schedule:
-    - cron: '*/5 * * * *'   # Every 5 min (GitHub minimum)
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -27,38 +27,33 @@ jobs:
           npm install
           npx playwright install chromium --with-deps
 
-      - name: Loop every 10s for 4.5 minutes
-        id: scrape_loop
+      - name: Scrape loop (every 10s, 4.5 min total)
+        id: loop
         run: |
           FILE_CHANGED=false
-          END=$(( $(date +%s) + 270 ))   # 4.5 * 60 = 270 sec
+          END=$(( $(date +%s) + 270 ))
 
           while [ $(date +%s) -lt $END ]; do
             echo "--- $(date '+%H:%M:%S') ---"
             node scraper.js
-            EXIT_CODE=$?
+            CODE=$?
 
-            if [ $EXIT_CODE -eq 2 ]; then
-              echo "File updated!"
+            if [ $CODE -eq 2 ]; then
               FILE_CHANGED=true
+              echo "  >> File updated!"
             fi
 
             REMAINING=$(( END - $(date +%s) ))
-            if [ $REMAINING -gt 10 ]; then
-              sleep 10
-            else
-              break
-            fi
+            [ $REMAINING -gt 10 ] && sleep 10 || break
           done
 
           echo "file_changed=$FILE_CHANGED" >> $GITHUB_OUTPUT
 
-      - name: Commit & push if changed
-        if: steps.scrape_loop.outputs.file_changed == 'true'
+      - name: Commit & push
+        if: steps.loop.outputs.file_changed == 'true'
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name  "github-actions[bot]"
           git add utolsomerkozesek.json
-          git diff --staged --quiet || git commit -m "chore: update utolsomerkozesek.json [$(date '+%Y-%m-%d %H:%M:%S UTC')]"
+          git diff --staged --quiet || git commit -m "update: utolsomerkozesek.json [$(date '+%Y-%m-%d %H:%M UTC')]"
           git push
-          echo "Pushed!"
