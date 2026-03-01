@@ -1,0 +1,12 @@
+{
+  "name": "sportradar-scraper",
+  "version": "1.0.0",
+  "description": "Scraper for last 13 virtual football matches",
+  "main": "scraper.js",
+  "scripts": {
+    "scrape": "node scraper.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}

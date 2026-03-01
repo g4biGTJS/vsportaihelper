@@ -1,0 +1,74 @@
+name: Sportradar Scraper
+
+on:
+  schedule:
+    # Runs every 5 minutes (GitHub minimum)
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run scraper loop (10s interval for 4.5 minutes)
+        run: |
+          CHANGED=false
+          END_TIME=$(( $(date +%s) + 270 ))  # 4.5 minutes = 270 seconds
+
+          while [ $(date +%s) -lt $END_TIME ]; do
+            echo "========================================"
+            echo "Scraping at $(date '+%Y-%m-%d %H:%M:%S')..."
+            echo "========================================"
+
+            node scraper.js
+
+            # Check if file was modified in last 15 seconds
+            if [ -f "utolsomerkozesek.json" ]; then
+              LAST_MOD=$(date -r utolsomerkozesek.json +%s 2>/dev/null || echo 0)
+              NOW=$(date +%s)
+              DIFF=$(( NOW - LAST_MOD ))
+              if [ $DIFF -lt 15 ]; then
+                CHANGED=true
+                echo "File was updated!"
+              fi
+            fi
+
+            echo "Waiting 10 seconds..."
+            sleep 10
+          done
+
+          echo "Loop finished. Changed: $CHANGED"
+
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          git add utolsomerkozesek.json
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update utolsomerkozesek.json - $(date '+%Y-%m-%d %H:%M:%S UTC')"
+            git push
+            echo "Pushed changes!"
+          fi
